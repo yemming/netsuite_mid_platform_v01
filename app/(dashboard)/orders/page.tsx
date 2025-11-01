@@ -10,32 +10,75 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus } from 'lucide-react';
+import { Plus, Database } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/server';
+import { SyncNetSuiteOrdersButton } from '@/components/orders/sync-button';
 
 async function getOrders() {
   const supabase = await createClient();
   
-  const { data: orders, error } = await supabase
+  // 從 sales_orders 表取得訂單（NetSuite 同步的訂單）
+  const { data: salesOrders, error: salesOrdersError } = await supabase
+    .from('sales_orders')
+    .select('id, netsuite_id, order_number, customer_id, order_date, total_amount, status, currency')
+    .order('order_date', { ascending: false })
+    .limit(100);
+
+  // 從 orders 表取得其他訂單
+  const { data: regularOrders, error: ordersError } = await supabase
     .from('orders')
     .select('id, order_number, customer_id, customer_name, total_amount, status, order_date')
     .order('order_date', { ascending: false })
     .limit(100);
 
-  if (error) {
-    console.error('Error fetching orders:', error);
-    return [];
-  }
+  // 取得客戶資訊（如果 sales_orders 有 customer_id，嘗試查詢）
+  // 注意：由於類型不匹配（bigint vs uuid），我們可能需要用其他方式匹配
+  // 先簡化顯示，之後可以改進
+  const formattedSalesOrders = (salesOrders || []).map((order: any) => {
+    // 暫時顯示訂單號碼和狀態
+    return {
+      id: order.id,
+      order_number: order.order_number,
+      customer_name: 'NetSuite Customer', // 暫時顯示，之後可以改進
+      order_date: order.order_date,
+      total_amount: order.total_amount,
+      status: order.status,
+      netsuite_id: order.netsuite_id,
+      is_netsuite: true,
+    };
+  });
 
-  return orders || [];
+  // 轉換 orders 格式
+  const formattedRegularOrders = (regularOrders || []).map((order: any) => ({
+    ...order,
+    is_netsuite: false,
+  }));
+
+  // 合併並排序
+  const allOrders = [...formattedSalesOrders, ...formattedRegularOrders]
+    .sort((a, b) => {
+      const dateA = new Date(a.order_date || 0).getTime();
+      const dateB = new Date(b.order_date || 0).getTime();
+      return dateB - dateA;
+    })
+    .slice(0, 100);
+
+  return allOrders;
 }
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'success' | 'destructive' }> = {
+  // 標準狀態
   pending: { label: '待處理', variant: 'secondary' },
   processing: { label: '處理中', variant: 'default' },
   completed: { label: '已完成', variant: 'success' },
   cancelled: { label: '已取消', variant: 'destructive' },
+  // NetSuite 狀態
+  'pending fulfillment': { label: '待履行', variant: 'secondary' },
+  'partially fulfilled': { label: '部分履行', variant: 'default' },
+  'billed': { label: '已開票', variant: 'success' },
+  'pending billing': { label: '待開票', variant: 'secondary' },
+  'fulfilled': { label: '已履行', variant: 'success' },
 };
 
 export default async function OrdersPage() {
@@ -46,14 +89,23 @@ export default async function OrdersPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">訂單管理</h1>
-          <p className="text-muted-foreground">管理所有訂單</p>
+          <p className="text-muted-foreground">
+            管理所有訂單 {orders.length > 0 && (
+              <span className="text-green-600">
+                • {orders.filter((o: any) => o.is_netsuite).length} 筆來自 NetSuite
+              </span>
+            )}
+          </p>
         </div>
-        <Link href="/orders/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            新增訂單
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <SyncNetSuiteOrdersButton />
+          <Link href="/orders/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              新增訂單
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>
@@ -80,12 +132,27 @@ export default async function OrdersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                orders.map((order) => {
-                  const status = statusConfig[order.status] || { label: order.status, variant: 'secondary' as const };
+                orders.map((order: any) => {
+                  // 處理狀態（不區分大小寫）
+                  const statusKey = order.status?.toLowerCase() || '';
+                  const status = statusConfig[statusKey] || 
+                                { label: order.status || 'Unknown', variant: 'secondary' as const };
+                  const isNetSuite = order.is_netsuite || order.netsuite_id;
+                  
                   return (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.order_number}</TableCell>
-                      <TableCell>{order.customer_name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {order.order_number}
+                          {isNetSuite && (
+                            <Badge variant="outline" className="text-xs">
+                              <Database className="mr-1 h-3 w-3" />
+                              NetSuite
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{order.customer_name || '-'}</TableCell>
                       <TableCell>{order.order_date ? formatDate(order.order_date) : '-'}</TableCell>
                       <TableCell>{formatCurrency(Number(order.total_amount || 0))}</TableCell>
                       <TableCell>

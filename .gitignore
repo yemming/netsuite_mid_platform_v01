@@ -1,0 +1,54 @@
+# 環境變數（不要提交敏感資訊）
+.env
+.env.local
+.env.production.local
+.env.development.local
+.env*.local
+
+# Next.js
+.next/
+out/
+dist/
+build/
+.vercel
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# 測試
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 日誌
+logs/
+*.log
+
+# 快取
+.cache/
+.parcel-cache/
+
+# 臨時文件
+tmp/
+temp/
+

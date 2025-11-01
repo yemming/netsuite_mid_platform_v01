@@ -8,6 +8,7 @@ import {
   Package, 
   Users, 
   PlaySquare,
+  Database,
   LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,11 @@ const menuItems = [
     title: '交易模擬器',
     href: '/simulator',
     icon: PlaySquare,
+  },
+  {
+    title: '訂閱資料集',
+    href: '/datasets',
+    icon: Database,
   },
 ];
 

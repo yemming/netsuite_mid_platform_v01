@@ -244,6 +244,40 @@ export class NetSuiteAPIClient {
       orderData
     );
   }
+
+  // 取得 metadata catalog（可用資料集列表）
+  async getMetadataCatalog() {
+    return this.request<{
+      items: Array<{ name: string; links: Array<{ rel: string; href: string }> }>;
+    }>('/services/rest/record/v1/metadata-catalog');
+  }
+
+  // 取得特定資料集的資料
+  async getDatasetRecords(datasetName: string, params?: { limit?: number; offset?: number; q?: string; }) {
+    const queryParams: Record<string, string> = {};
+    if (params?.limit) queryParams.limit = params.limit.toString();
+    if (params?.offset) queryParams.offset = params.offset.toString();
+    if (params?.q) queryParams.q = params.q;
+
+    // 先取得列表
+    const list = await this.request<{
+      items: Array<{ id: string; links: Array<{ rel: string; href: string }> }>;
+      count?: number;
+      hasMore?: boolean;
+    }>(
+      `/services/rest/record/v1/${datasetName}`,
+      'GET',
+      undefined,
+      queryParams
+    );
+
+    return list;
+  }
+
+  // 取得單筆記錄
+  async getDatasetRecord(datasetName: string, recordId: string) {
+    return this.request(`/services/rest/record/v1/${datasetName}/${recordId}`);
+  }
 }
 
 // 建立單例

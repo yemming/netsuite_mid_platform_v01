@@ -9,7 +9,9 @@ import {
   Users, 
   PlaySquare,
   Database,
-  LogOut
+  LogOut,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -46,6 +48,11 @@ const menuItems = [
     href: '/datasets',
     icon: Database,
   },
+  {
+    title: '手工處理記錄',
+    href: '/datasets/skipped-items',
+    icon: AlertCircle,
+  },
 ];
 
 export function Sidebar() {
@@ -60,10 +67,21 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
-        <h1 className="text-xl font-bold">NetSuite 中台</h1>
+    <div className="flex h-screen w-64 flex-col border-r bg-[hsl(var(--sidebar-background))] transition-smooth">
+      {/* Logo 區域 */}
+      <div className="flex h-16 items-center border-b border-[hsl(var(--sidebar-border))] px-6">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <Sparkles className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">NetSuite</h1>
+            <p className="text-xs text-muted-foreground">中台管理系統</p>
+          </div>
+        </div>
       </div>
+
+      {/* 導航菜單 */}
       <nav className="flex-1 space-y-1 p-4">
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -71,24 +89,35 @@ export function Sidebar() {
           
           return (
             <Link key={item.href} href={item.href}>
-              <Button
-                variant={isActive ? 'secondary' : 'ghost'}
+              <div
                 className={cn(
-                  'w-full justify-start',
-                  isActive && 'bg-secondary'
+                  'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-smooth',
+                  isActive
+                    ? 'bg-primary/10 text-primary shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
               >
-                <Icon className="mr-2 h-4 w-4" />
-                {item.title}
-              </Button>
+                <Icon 
+                  className={cn(
+                    'h-4 w-4 transition-smooth',
+                    isActive ? 'text-primary' : 'group-hover:scale-110'
+                  )} 
+                />
+                <span>{item.title}</span>
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
+                )}
+              </div>
             </Link>
           );
         })}
       </nav>
-      <div className="border-t p-4">
+
+      {/* 登出按鈕 */}
+      <div className="border-t border-[hsl(var(--sidebar-border))] p-4">
         <Button 
           variant="ghost" 
-          className="w-full justify-start"
+          className="w-full justify-start text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />

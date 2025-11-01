@@ -33,7 +33,7 @@ export function DatasetSubscriptionPanel() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<DatasetType>('master');
+  const [activeTab, setActiveTab] = useState<DatasetType>('subscribed');
   const [syncProgress, setSyncProgress] = useState<Record<string, { total: number; synced: number; status: string }>>({});
   const [errorShown, setErrorShown] = useState(false);
 
@@ -234,15 +234,32 @@ export function DatasetSubscriptionPanel() {
   };
 
   const startPollingTaskStatus = async (datasetNames: string[]) => {
-    const maxAttempts = 120;
+    const maxAttempts = 120; // 最多輪詢 120 次（約 2 分鐘）
     let attempts = 0;
-    const pollInterval = 1000;
+    const pollInterval = 1000; // 每 1 秒輪詢一次
     let pollingActive = true;
+    const maxWaitTime = 5 * 60 * 1000; // 最大等待時間 5 分鐘
+    const startTime = Date.now();
 
     const checkStatus = async () => {
       if (!pollingActive) return;
       
       attempts++;
+      
+      // 檢查是否超過最大等待時間（防止永久卡住）
+      if (Date.now() - startTime > maxWaitTime) {
+        console.warn('輪詢超時，停止輪詢');
+        pollingActive = false;
+        setSyncing(false);
+        
+        // 顯示超時警告
+        const timeoutError = `以下資料集同步超時（超過 5 分鐘）: ${datasetNames.join(', ')}。請檢查任務詳情或稍後重試。`;
+        if (!errorShown) {
+          alert(timeoutError);
+          setErrorShown(true);
+        }
+        return;
+      }
 
       try {
         const tasksResponse = await Promise.all(
@@ -255,7 +272,7 @@ export function DatasetSubscriptionPanel() {
         let allCompleted = true;
         let hasRunning = false;
         let hasFailed = false;
-        const progress: Record<string, { total: number; synced: number; status: string }> = {};
+        const progress: Record<string, { total: number; synced: number; skipped: number; status: string }> = {};
 
         tasksResponse.forEach((result: any, index: number) => {
           const datasetName = datasetNames[index];
@@ -264,6 +281,7 @@ export function DatasetSubscriptionPanel() {
             progress[datasetName] = {
               total: latestTask.total_records || 0,
               synced: latestTask.synced_records || 0,
+              skipped: latestTask.skipped_records || 0,
               status: latestTask.status,
             };
 
@@ -365,17 +383,19 @@ export function DatasetSubscriptionPanel() {
   const customStats = getTypeStats('custom');
 
   return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
+    <Card className="card-shadow transition-smooth hover:card-shadow-lg">
+      <CardHeader className="border-b">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <Database className="h-4 w-4 text-primary" />
+          </div>
           訂閱 NetSuite 資料集
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="mt-2">
           選擇要同步到 Supabase 的 NetSuite 資料集，系統會自動定期同步
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
         {/* 統計資訊 */}
         <div className="flex items-center gap-4 text-sm">
           <Badge variant="outline">總共 {datasets.length} 個資料集</Badge>
@@ -420,7 +440,14 @@ export function DatasetSubscriptionPanel() {
                         <span>{name}:</span>
                         <span>
                           {progress.total > 0 
-                            ? `${progress.synced}/${progress.total} (${Math.round((progress.synced / progress.total) * 100)}%)`
+                            ? (() => {
+                                const skipped = progress.skipped || 0;
+                                const effectiveTotal = progress.total - skipped;
+                                const percentage = effectiveTotal > 0 
+                                  ? Math.round((progress.synced / effectiveTotal) * 100)
+                                  : 100;
+                                return `${progress.synced}/${progress.total}${skipped > 0 ? ` (跳過 ${skipped} 筆)` : ''} (${percentage}%)`;
+                              })()
                             : progress.status === 'running' ? '處理中...' : progress.status}
                         </span>
                       </div>
@@ -435,11 +462,23 @@ export function DatasetSubscriptionPanel() {
         {/* Tab 頁籤 */}
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as DatasetType)}>
           <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="subscribed">已訂閱</TabsTrigger>
             <TabsTrigger value="master">主檔類</TabsTrigger>
             <TabsTrigger value="transaction">交易類</TabsTrigger>
             <TabsTrigger value="custom">客製類</TabsTrigger>
-            <TabsTrigger value="subscribed">已訂閱</TabsTrigger>
           </TabsList>
+
+          {/* 已訂閱 Tab - 放在第一個 */}
+          <TabsContent value="subscribed" className="mt-4">
+            <DatasetList
+              datasets={getFilteredDatasets('subscribed')}
+              subscriptions={subscriptions}
+              syncProgress={syncProgress}
+              onToggle={toggleSubscription}
+              onBulkSubscribe={() => {}} // 已訂閱 Tab 不支援批量操作
+              hideBulkActions={true}
+            />
+          </TabsContent>
 
           {/* 主檔類 Tab */}
           <TabsContent value="master" className="mt-4">
@@ -473,18 +512,6 @@ export function DatasetSubscriptionPanel() {
               onBulkSubscribe={(subscribe) => bulkSubscribe('custom', subscribe)}
             />
           </TabsContent>
-
-          {/* 已訂閱 Tab */}
-          <TabsContent value="subscribed" className="mt-4">
-            <DatasetList
-              datasets={getFilteredDatasets('subscribed')}
-              subscriptions={subscriptions}
-              syncProgress={syncProgress}
-              onToggle={toggleSubscription}
-              onBulkSubscribe={() => {}} // 已訂閱 Tab 不支援批量操作
-              hideBulkActions={true}
-            />
-          </TabsContent>
         </Tabs>
 
         {/* 使用說明 */}
@@ -502,7 +529,7 @@ export function DatasetSubscriptionPanel() {
 interface DatasetListProps {
   datasets: Dataset[];
   subscriptions: Record<string, Subscription>;
-  syncProgress: Record<string, { total: number; synced: number; status: string }>;
+  syncProgress: Record<string, { total: number; synced: number; skipped?: number; status: string }>;
   onToggle: (dataset: Dataset) => void;
   onBulkSubscribe: (subscribe: boolean) => void;
   hideBulkActions?: boolean;
@@ -593,23 +620,40 @@ function DatasetList({
                              syncProgress[dataset.name].status === 'completed' ? '已完成' :
                              syncProgress[dataset.name].status === 'failed' ? '同步失敗' : '等待中...'}
                           </span>
-                          {syncProgress[dataset.name].total > 0 && (
-                            <span className="font-medium">
-                              {syncProgress[dataset.name].synced}/{syncProgress[dataset.name].total}
-                              {' '}({Math.round((syncProgress[dataset.name].synced / syncProgress[dataset.name].total) * 100)}%)
-                            </span>
-                          )}
+                          {syncProgress[dataset.name].total > 0 && (() => {
+                            const progress = syncProgress[dataset.name];
+                            const skipped = progress.skipped || 0;
+                            const effectiveTotal = progress.total - skipped; // 排除跳過的記錄計算百分比
+                            const percentage = effectiveTotal > 0 
+                              ? Math.round((progress.synced / effectiveTotal) * 100)
+                              : 100;
+                            return (
+                              <span className="font-medium">
+                                {progress.synced}/{progress.total}
+                                {skipped > 0 && ` (跳過 ${skipped} 筆)`}
+                                {' '}({percentage}%)
+                              </span>
+                            );
+                          })()}
                         </div>
-                        {syncProgress[dataset.name].total > 0 && (
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
-                            <div
-                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${Math.min((syncProgress[dataset.name].synced / syncProgress[dataset.name].total) * 100, 100)}%`
-                              }}
-                            />
-                          </div>
-                        )}
+                        {syncProgress[dataset.name].total > 0 && (() => {
+                          const progress = syncProgress[dataset.name];
+                          const skipped = progress.skipped || 0;
+                          const effectiveTotal = progress.total - skipped;
+                          const percentage = effectiveTotal > 0 
+                            ? Math.min((progress.synced / effectiveTotal) * 100, 100)
+                            : 100;
+                          return (
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div
+                                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${percentage}%`
+                                }}
+                              />
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     {/* 顯示最後同步時間 */}

@@ -85,14 +85,16 @@ export default async function OrdersPage() {
   const orders = await getOrders();
 
   return (
-    <div className="p-8">
+    <div className="p-6 md:p-8">
+      {/* 頁首區域 */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">訂單管理</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">訂單管理</h1>
+          <p className="text-muted-foreground mt-1.5">
             管理所有訂單 {orders.length > 0 && (
-              <span className="text-green-600">
-                • {orders.filter((o: any) => o.is_netsuite).length} 筆來自 NetSuite
+              <span className="inline-flex items-center gap-1 text-green-600 font-medium">
+                <Database className="h-3 w-3" />
+                {orders.filter((o: any) => o.is_netsuite).length} 筆來自 NetSuite
               </span>
             )}
           </p>
@@ -100,7 +102,7 @@ export default async function OrdersPage() {
         <div className="flex items-center gap-2">
           <SyncNetSuiteOrdersButton />
           <Link href="/orders/create">
-            <Button>
+            <Button className="transition-smooth hover:shadow-md">
               <Plus className="mr-2 h-4 w-4" />
               新增訂單
             </Button>
@@ -108,69 +110,78 @@ export default async function OrdersPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>訂單列表 ({orders.length} 筆)</CardTitle>
+      {/* 訂單列表卡片 */}
+      <Card className="card-shadow transition-smooth">
+        <CardHeader className="border-b">
+          <CardTitle className="text-lg font-semibold">訂單列表 ({orders.length} 筆)</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>訂單號</TableHead>
-                <TableHead>客戶名稱</TableHead>
-                <TableHead>訂單日期</TableHead>
-                <TableHead>總金額</TableHead>
-                <TableHead>狀態</TableHead>
-                <TableHead className="text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    沒有找到訂單
-                  </TableCell>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold">訂單號</TableHead>
+                  <TableHead className="font-semibold">客戶名稱</TableHead>
+                  <TableHead className="font-semibold">訂單日期</TableHead>
+                  <TableHead className="font-semibold">總金額</TableHead>
+                  <TableHead className="font-semibold">狀態</TableHead>
+                  <TableHead className="text-right font-semibold">操作</TableHead>
                 </TableRow>
-              ) : (
-                orders.map((order: any) => {
-                  // 處理狀態（不區分大小寫）
-                  const statusKey = order.status?.toLowerCase() || '';
-                  const status = statusConfig[statusKey] || 
-                                { label: order.status || 'Unknown', variant: 'secondary' as const };
-                  const isNetSuite = order.is_netsuite || order.netsuite_id;
-                  
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {order.order_number}
-                          {isNetSuite && (
-                            <Badge variant="outline" className="text-xs">
-                              <Database className="mr-1 h-3 w-3" />
-                              NetSuite
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{order.customer_name || '-'}</TableCell>
-                      <TableCell>{order.order_date ? formatDate(order.order_date) : '-'}</TableCell>
-                      <TableCell>{formatCurrency(Number(order.total_amount || 0))}</TableCell>
-                      <TableCell>
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/orders/${order.id}`}>
-                          <Button variant="ghost" size="sm">
-                            查看
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {orders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="flex flex-col items-center justify-center">
+                        <Database className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                        <p className="text-muted-foreground">沒有找到訂單</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  orders.map((order: any, index: number) => {
+                    // 處理狀態（不區分大小寫）
+                    const statusKey = order.status?.toLowerCase() || '';
+                    const status = statusConfig[statusKey] || 
+                                  { label: order.status || 'Unknown', variant: 'secondary' as const };
+                    const isNetSuite = order.is_netsuite || order.netsuite_id;
+                    
+                    return (
+                      <TableRow 
+                        key={order.id}
+                        className="transition-smooth hover:bg-muted/30"
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{order.order_number}</span>
+                            {isNetSuite && (
+                              <Badge variant="outline" className="text-xs border-primary/20 text-primary bg-primary/5">
+                                <Database className="mr-1 h-3 w-3" />
+                                NetSuite
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{order.customer_name || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{order.order_date ? formatDate(order.order_date) : '-'}</TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(Number(order.total_amount || 0))}</TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant} className="font-medium">{status.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/orders/${order.id}`}>
+                            <Button variant="ghost" size="sm" className="transition-smooth hover:bg-primary/10 hover:text-primary">
+                              查看
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

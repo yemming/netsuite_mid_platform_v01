@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Terminal, Play, Download, FileText, Eye, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ interface SuiteQLTable {
   is_available: boolean;
 }
 
-export default function UniversalSQLDownloaderPage() {
+function UniversalSQLDownloaderContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('query-editor');
   const [query, setQuery] = useState('SELECT * FROM customer');
@@ -908,6 +908,23 @@ export default function UniversalSQLDownloaderPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function UniversalSQLDownloaderPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8">
+        <div className="text-center py-8">
+          <div className="inline-flex items-center gap-2">
+            <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            載入中...
+          </div>
+        </div>
+      </div>
+    }>
+      <UniversalSQLDownloaderContent />
+    </Suspense>
   );
 }
 

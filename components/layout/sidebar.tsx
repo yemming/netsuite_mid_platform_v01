@@ -11,7 +11,9 @@ import {
   Database,
   LogOut,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Table2,
+  Terminal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -52,6 +54,16 @@ const menuItems = [
     title: '手工處理記錄',
     href: '/datasets/skipped-items',
     icon: AlertCircle,
+  },
+  {
+    title: '萬能 SQL 下載器',
+    href: '/universal-sql-downloader',
+    icon: Terminal,
+  },
+  {
+    title: 'SuiteQL 查詢表',
+    href: '/suiteql-tables',
+    icon: Table2,
   },
 ];
 

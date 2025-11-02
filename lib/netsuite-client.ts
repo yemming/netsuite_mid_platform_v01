@@ -278,6 +278,59 @@ export class NetSuiteAPIClient {
   async getDatasetRecord(datasetName: string, recordId: string) {
     return this.request(`/services/rest/record/v1/${datasetName}/${recordId}`);
   }
+
+  // 執行 SuiteQL 查詢
+  async executeSuiteQL(query: string): Promise<{
+    items: any[];
+    count?: number;
+    hasMore?: boolean;
+    links?: Array<{ rel: string; href: string }>;
+  }> {
+    const endpoint = '/services/rest/query/v1/suiteql';
+    
+    // 建立完整 URL
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    // 生成認證標頭
+    const authHeader = this.generateAuthHeader('POST', url);
+    
+    // 準備請求標頭（SuiteQL 需要 Prefer header）
+    const headers: Record<string, string> = {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+      'Prefer': 'transient',
+      'Accept': 'application/json',
+    };
+    
+    // 發送請求
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ q: query }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `NetSuite API error (${response.status})`;
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson['o:errorDetails'] && errorJson['o:errorDetails'][0]) {
+          errorMessage = errorJson['o:errorDetails'][0].detail || errorMessage;
+        } else if (errorJson.detail) {
+          errorMessage = errorJson.detail;
+        } else if (errorJson.title) {
+          errorMessage = errorJson.title;
+        }
+      } catch {
+        errorMessage = errorText.substring(0, 500);
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    return response.json();
+  }
 }
 
 // 建立單例
